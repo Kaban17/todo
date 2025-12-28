@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,12 +22,17 @@ func main() {
 	todoUseCase := usecase.NewTodoUseCase(todoRepo)
 	todoHandler := handler.NewTodoHandler(todoUseCase)
 
+	log := setupLogger()
 	// Настройка роутера
 	mux := http.NewServeMux()
 
 	// Регистрация эндпоинтов
 	mux.HandleFunc("/todos", todoHandler.HandleTodos)
 	mux.HandleFunc("/todos/", todoHandler.HandleTodoByID)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "OK")
+		w.WriteHeader(http.StatusOK)
+	})
 
 	// Применение middleware
 	handlerWithMiddleware := middleware.Logger(
@@ -51,27 +56,27 @@ func main() {
 
 	// Запуск сервера в отдельной горутине
 	go func() {
-		log.Printf("Starting server on %s", server.Addr)
+		log.Info("Starting server on", "address", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Server error: %v", err)
+			log.Error("Server error:", "error", err)
 		}
 	}()
 
-	log.Println("Server started successfully")
+	log.Info("Server started successfully")
 
 	// Ожидание сигнала для остановки
 	<-done
-	log.Println("Server stopping...")
+	log.Info("Server stopping...")
 
 	// Graceful shutdown с таймаутом
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server shutdown failed: %v", err)
+		log.Error("Server shutdown failed:", "error", err)
 	}
 
-	log.Println("Server stopped gracefully")
+	log.Info("Server stopped gracefully")
 }
 func setupLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
