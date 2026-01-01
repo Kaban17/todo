@@ -111,7 +111,10 @@ go test ./internal/http/handler -v
 
 # Интеграционные тесты
 go test ./test -v
-```
+
+# Нагрузочное тестирование
+make load_test
+``
 
 
 
